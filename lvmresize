@@ -159,3 +159,9 @@ drwxrwxr-x 18 fworks  fworks       4096 Dec  3 16:04 installer
 -rw-r--r--  1 sharper fworks 2168103961 Dec  3 12:15 installer.tar.gz
 drwx------  2 fworks  fworks      16384 Nov  4 06:24 lost+found
 -rw-r--r--  1 istacey root       221328 Dec 16 06:32 test-20201216
+
+[root@ilscha99-labpm11-config01 fw]# lsblk | tail -3
+vdb                       252:16   0  682G  0 disk 
+└─vdb1                    252:17   0  682G  0 part 
+  └─vg_confmgr-lv_confmgr 253:1    0  682G  0 lvm  /fw
+
