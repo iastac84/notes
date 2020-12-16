@@ -1,0 +1,161 @@
+LVM resize test (Shrink) 
+
+:::::VM:::::
+
+
+Start: 
+
+[istacey@ilscha99-labpm11-config01 ansible]$ df -h /fw
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/vg_confmgr-lv_confmgr  709G  4.4G  669G   1% /fw
+
+
+
+[root@ilscha99-labpm11-config01 /]# resize2fs /dev/vg_confmgr/lv_confmgr 660G
+resize2fs 1.42.9 (28-Dec-2013)
+Resizing the filesystem on /dev/vg_confmgr/lv_confmgr to 173015040 (4k) blocks.
+The filesystem on /dev/vg_confmgr/lv_confmgr is now 173015040 blocks long.
+
+[root@ilscha99-labpm11-config01 /]# lvreduce -L 661G /dev/vg_confmgr/lv_confmgr
+  WARNING: Reducing active logical volume to 661.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce vg_confmgr/lv_confmgr? [y/n]: y
+  Size of logical volume vg_confmgr/lv_confmgr changed from <720.00 GiB (184319 extents) to 661.00 GiB (169216 extents).
+  Logical volume vg_confmgr/lv_confmgr successfully resized.
+
+[root@ilscha99-labpm11-config01 /]# mount -a
+[root@ilscha99-labpm11-config01 /]# df -h /fw
+Filesystem                         Size  Used Avail Use% Mounted on
+/dev/mapper/vg_confmgr-lv_confmgr  650G  4.4G  613G   1% /fw
+
+[root@ilscha99-labpm11-config01 /]# lsblk | tail -2
+└─vdb1                    252:17   0  720G  0 part 
+  └─vg_confmgr-lv_confmgr 253:1    0  661G  0 lvm  /fw
+
+:::::HOST:::::
+
+
+[istacey@ilscha99-labpm11-omhost ~]$ lsblk | grep sdc -A2
+sdc                           8:32   0 838.3G  0 disk 
+└─sdc1                        8:33   0 838.3G  0 part 
+  ├─vg_conf_mgr-lv_conf_mgr 253:4    0   720G  0 lvm  
+  └─vg_conf_mgr-lv_logstash 253:5    0    80G  0 lvm  
+
+[istacey@ilscha99-labpm11-omhost ~]$ sudo virsh dumpxml ilscha99-labpm11-config01 | grep source | egrep 'file|dev'
+      <source file='/var/lib/libvirt/images/ilscha99-labpm11-config01.qcow2'/>
+      <source dev='/dev/vg_conf_mgr/lv_conf_mgr'/>
+
+[istacey@ilscha99-labpm11-omhost ~]$ sudo lvs ; sudo lvreduce -L 682G /dev/vg_conf_mgr/lv_conf_mgr 
+  LV            VG          Attr       LSize    Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  data1         rhel        -wi-ao----  200.00g                                                    
+  home          rhel        -wi-ao----   20.00g                                                    
+  opt           rhel        -wi-ao----   25.00g                                                    
+  root          rhel        -wi-ao----   50.00g                                                    
+  swap          rhel        -wi-ao----   16.00g                                                    
+  tmp           rhel        -wi-ao----   12.00g                                                    
+  var           rhel        -wi-ao----  390.00g                                                    
+  var_log       rhel        -wi-ao----   12.00g                                                    
+  var_log_audit rhel        -wi-ao----   12.00g                                                    
+  lv_conf_mgr   vg_conf_mgr -wi-a-----  720.00g                                                    
+  lv_logstash   vg_conf_mgr -wi-ao----   80.00g                                                    
+  lv_images     vg_images   -wi-ao---- <838.33g                                                    
+  lv_ums        vg_ums      -wi-ao----  750.00g                                                    
+  WARNING: Reducing active logical volume to 682.00 GiB.
+  THIS MAY DESTROY YOUR DATA (filesystem etc.)
+Do you really want to reduce vg_conf_mgr/lv_conf_mgr? [y/n]: y
+  Size of logical volume vg_conf_mgr/lv_conf_mgr changed from 720.00 GiB (184320 extents) to 682.00 GiB (174592 extents).
+  Logical volume vg_conf_mgr/lv_conf_mgr successfully resized.
+
+[istacey@ilscha99-labpm11-omhost ~]$ sudo lvs | grep conf
+  lv_conf_mgr   vg_conf_mgr -wi-a-----  682.00g                                                    
+  lv_logstash   vg_conf_mgr -wi-ao----   80.00g                           
+
+:::::VM:::::
+
+
+[istacey@ilscha99-labpm11-config01 ~]$ w; df -hT /fw
+ 06:52:26 up 0 min,  1 user,  load average: 0.25, 0.06, 0.02
+USER     TTY      FROM             LOGIN@   IDLE   JCPU   PCPU WHAT
+istacey  pts/0    10.189.126.36    06:52    2.00s  0.11s  0.02s w
+Filesystem                        Type  Size  Used Avail Use% Mounted on
+/dev/mapper/vg_confmgr-lv_confmgr ext4  650G  4.4G  613G   1% /fw
+
+[istacey@ilscha99-labpm11-config01 ~]$ lsblk | tail -3
+vdb                       252:16   0  682G  0 disk 
+└─vdb1                    252:17   0  682G  0 part 
+  └─vg_confmgr-lv_confmgr 253:1    0  661G  0 lvm  /fw
+
+
+[root@ilscha99-labpm11-config01 ~]# lvextend -r /dev/mapper/vg_confmgr-lv_confmgr -L 680G
+  WARNING: Device /dev/vdb1 has size of 1430255616 sectors which is smaller than corresponding PV size of 1509947392 sectors. Was device resized?
+  One or more devices used as PVs in VG vg_confmgr have changed sizes.
+fsck from util-linux 2.23.2
+/dev/mapper/vg_confmgr-lv_confmgr: 3641/43253760 files (0.9% non-contiguous), 3881453/173015040 blocks
+  Size of logical volume vg_confmgr/lv_confmgr changed from 661.00 GiB (169216 extents) to 680.00 GiB (174080 extents).
+  Logical volume vg_confmgr/lv_confmgr successfully resized.
+resize2fs 1.42.9 (28-Dec-2013)
+Resizing the filesystem on /dev/mapper/vg_confmgr-lv_confmgr to 178257920 (4k) blocks.
+The filesystem on /dev/mapper/vg_confmgr-lv_confmgr is now 178257920 blocks long.
+
+[istacey@ilscha99-labpm11-config01 ~]$ sudo vgs
+  WARNING: Device /dev/vdb1 has size of 1430255616 sectors which is smaller than corresponding PV size of 1509947392 sectors. Was device resized?
+  One or more devices used as PVs in VG vg_confmgr have changed sizes.
+  VG         #PV #LV #SN Attr   VSize    VFree   
+  vg0          1   7   0 wz--n-  <71.00g 1020.00m
+  vg_confmgr   1   1   0 wz--n- <720.00g  <59.00g
+
+[root@ilscha99-labpm11-config01 ~]# pvs
+  WARNING: Device /dev/vdb1 has size of 1430255616 sectors which is smaller than corresponding PV size of 1509947392 sectors. Was device resized?
+  One or more devices used as PVs in VG vg_confmgr have changed sizes.
+  PV         VG         Fmt  Attr PSize    PFree   
+  /dev/vda2  vg0        lvm2 a--   <71.00g 1020.00m
+  /dev/vdb1  vg_confmgr lvm2 a--  <720.00g  <59.00g
+
+[root@ilscha99-labpm11-config01 ~]# pvresize /dev/vdb1
+  WARNING: Device /dev/vdb1 has size of 1430255616 sectors which is smaller than corresponding PV size of 1509947392 sectors. Was device resized?
+  One or more devices used as PVs in VG vg_confmgr have changed sizes.
+  Physical volume "/dev/vdb1" changed
+  1 physical volume(s) resized or updated / 0 physical volume(s) not resized
+[root@ilscha99-labpm11-config01 ~]# pvs
+  PV         VG         Fmt  Attr PSize    PFree   
+  /dev/vda2  vg0        lvm2 a--   <71.00g 1020.00m
+  /dev/vdb1  vg_confmgr lvm2 a--  <682.00g   <2.00g
+
+[root@ilscha99-labpm11-config01 ~]# pvs
+  PV         VG         Fmt  Attr PSize    PFree   
+  /dev/vda2  vg0        lvm2 a--   <71.00g 1020.00m
+  /dev/vdb1  vg_confmgr lvm2 a--  <682.00g   <2.00g
+[root@ilscha99-labpm11-config01 ~]# vgs
+  VG         #PV #LV #SN Attr   VSize    VFree   
+  vg0          1   7   0 wz--n-  <71.00g 1020.00m
+  vg_confmgr   1   1   0 wz--n- <682.00g   <2.00g
+[root@ilscha99-labpm11-config01 ~]# lvs | grep conf
+  lv_confmgr vg_confmgr -wi-a----- 680.00g                                                    
+[root@ilscha99-labpm11-config01 ~]# 
+
+[root@ilscha99-labpm11-config01 ~]# mount -a 
+[root@ilscha99-labpm11-config01 ~]# df -hT /fw
+Filesystem                        Type  Size  Used Avail Use% Mounted on
+/dev/mapper/vg_confmgr-lv_confmgr ext4  670G  4.4G  631G   1% /fw
+
+[root@ilscha99-labpm11-config01 ~]# sudo lvextend -r /dev/mapper/vg_confmgr-lv_confmgr -l +100%FREE
+  Size of logical volume vg_confmgr/lv_confmgr changed from 680.00 GiB (174080 extents) to <682.00 GiB (174591 extents).
+  Logical volume vg_confmgr/lv_confmgr successfully resized.
+resize2fs 1.42.9 (28-Dec-2013)
+Filesystem at /dev/mapper/vg_confmgr-lv_confmgr is mounted on /fw; on-line resizing required
+old_desc_blocks = 85, new_desc_blocks = 86
+The filesystem on /dev/mapper/vg_confmgr-lv_confmgr is now 178781184 blocks long.
+
+
+[root@ilscha99-labpm11-config01 ~]# df -hT /fw
+Filesystem                        Type  Size  Used Avail Use% Mounted on
+/dev/mapper/vg_confmgr-lv_confmgr ext4  672G  4.4G  633G   1% /fw
+
+[root@ilscha99-labpm11-config01 ~]# ls -l /fw
+total 2117544
+drwxrwxr-x  5 fworks  fworks       4096 Dec  4 10:50 fwData
+drwxrwxr-x  2 fworks  fworks       4096 Dec  3 15:18 fwlogstat
+drwxrwxr-x 18 fworks  fworks       4096 Dec  3 16:04 installer
+-rw-r--r--  1 sharper fworks 2168103961 Dec  3 12:15 installer.tar.gz
+drwx------  2 fworks  fworks      16384 Nov  4 06:24 lost+found
+-rw-r--r--  1 istacey root       221328 Dec 16 06:32 test-20201216
